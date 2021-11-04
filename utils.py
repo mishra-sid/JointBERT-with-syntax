@@ -9,18 +9,23 @@ from seqeval.metrics import precision_score, recall_score, f1_score
 from transformers import BertConfig, DistilBertConfig, AlbertConfig
 from transformers import BertTokenizer, DistilBertTokenizer, AlbertTokenizer
 
-from model import JointBERT, JointDistilBERT, JointAlbert
+from model import JointBERT, JointDistilBERT, JointAlbert, JointSpanBERT
+
+import spanbert.pytorch_pretrained_bert.modeling as spbm
+import spanbert.pytorch_pretrained_bert.tokenization as spbt
 
 MODEL_CLASSES = {
     'bert': (BertConfig, JointBERT, BertTokenizer),
     'distilbert': (DistilBertConfig, JointDistilBERT, DistilBertTokenizer),
-    'albert': (AlbertConfig, JointAlbert, AlbertTokenizer)
+    'albert': (AlbertConfig, JointAlbert, AlbertTokenizer),
+    'spanbert': (spbm.BertConfig, JointSpanBERT, spbt.BertTokenizer),
 }
 
 MODEL_PATH_MAP = {
     'bert': 'bert-base-uncased',
     'distilbert': 'distilbert-base-uncased',
-    'albert': 'albert-xxlarge-v1'
+    'albert': 'albert-xxlarge-v1',
+    'spanbert': 'spanbert-base-cased'
 }
 
 
@@ -51,7 +56,11 @@ def set_seed(args):
 
 
 def compute_metrics(intent_preds, intent_labels, slot_preds, slot_labels):
+    slot_preds = [ slot_preds[ind] for ind in range(len(slot_labels)) if slot_labels[ind] != 3]
+    slot_labels = [ x for x in slot_labels if x != 3]
     assert len(intent_preds) == len(intent_labels) == len(slot_preds) == len(slot_labels)
+    
+
     results = {}
     intent_result = get_intent_acc(intent_preds, intent_labels)
     slot_result = get_slot_metrics(slot_preds, slot_labels)
