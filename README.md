@@ -1,6 +1,6 @@
 # JointBERT
 
-(Unofficial) Pytorch implementation of `JointBERT`: [BERT for Joint Intent Classification and Slot Filling](https://arxiv.org/abs/1902.10909)
+(Unofficial) Adding Syntactic Features to  `JointBERT`: [BERT for Joint Intent Classification and Slot Filling](https://arxiv.org/abs/1902.10909)
 
 ## Model Architecture
 
@@ -14,11 +14,11 @@
 
 ## Dependencies
 
-- python>=3.6
-- torch==1.6.0
-- transformers==3.0.2
-- seqeval==0.0.12
-- pytorch-crf==0.7.2
+- python
+- torch
+- transformers
+- seqeval
+- pytorch-crf
 
 ## Dataset
 
@@ -31,22 +31,32 @@
 - Add `UNK` for labels (For intent and slot labels which are only shown in _dev_ and _test_ dataset)
 - Add `PAD` for slot label
 
+## Generate Data
+
+```bash
+
+$ python generate_data.py --input_dir data/snips --output_dir data --setting bracketed.ground_truth
+
+# To generate all at once 
+$ ./bin/generate_all_data.sh
+```
+
 ## Training & Evaluation
 
 ```bash
-$ python3 main.py --task {task_name} \
+$ python3 train.py --task {task_name} \
                   --model_type {model_type} \
                   --model_dir {model_dir_name} \
                   --do_train --do_eval \
                   --use_crf
 
 # For ATIS
-$ python3 main.py --task atis \
+$ python3 train.py --task atis \
                   --model_type bert \
                   --model_dir atis_model \
                   --do_train --do_eval
 # For Snips
-$ python3 main.py --task snips \
+$ python3 train.py --task snips \
                   --model_type bert \
                   --model_dir snips_model \
                   --do_train --do_eval
@@ -60,35 +70,11 @@ $ python3 predict.py --input_file {INPUT_FILE_PATH} --output_file {OUTPUT_FILE_P
 
 ## Results
 
-- Run 5 ~ 10 epochs (Record the best result)
-- Only test with `uncased` model
-- ALBERT xxlarge sometimes can't converge well for slot prediction.
-
-|           |                  | Intent acc (%) | Slot F1 (%) | Sentence acc (%) |
-| --------- | ---------------- | -------------- | ----------- | ---------------- |
-| **Snips** | BERT             | **99.14**      | 96.90       | 93.00            |
-|           | BERT + CRF       | 98.57          | **97.24**   | **93.57**        |
-|           | DistilBERT       | 98.00          | 96.10       | 91.00            |
-|           | DistilBERT + CRF | 98.57          | 96.46       | 91.85            |
-|           | ALBERT           | 98.43          | 97.16       | 93.29            |
-|           | ALBERT + CRF     | 99.00          | 96.55       | 92.57            |
-| **ATIS**  | BERT             | 97.87          | 95.59       | 88.24            |
-|           | BERT + CRF       | **97.98**      | 95.93       | 88.58            |
-|           | DistilBERT       | 97.76          | 95.50       | 87.68            |
-|           | DistilBERT + CRF | 97.65          | 95.89       | 88.24            |
-|           | ALBERT           | 97.64          | 95.78       | 88.13            |
-|           | ALBERT + CRF     | 97.42          | **96.32**   | **88.69**        |
+TODO
 
 ## Updates
 
-- 2019/12/03: Add DistilBert and RoBERTa result
-- 2019/12/14: Add Albert (large v1) result
-- 2019/12/22: Available to predict sentences
-- 2019/12/26: Add Albert (xxlarge v1) result
-- 2019/12/29: Add CRF option
-- 2019/12/30: Available to check `sentence-level semantic frame accuracy`
-- 2020/01/23: Only show the result related with uncased model
-- 2020/04/03: Update with new prediction code
+- 2021/12/09: Add Generate data / training helper scripts  
 
 ## References
 

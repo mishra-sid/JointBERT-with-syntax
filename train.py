@@ -15,7 +15,7 @@ def main(args):
     test_dataset = load_and_cache_examples(args, tokenizer, mode="test")
 
     if args.do_train or args.do_eval:
-        trainer = Trainer(args, train_dataset, dev_dataset, test_dataset)
+        trainer = Trainer(args, train_dataset, dev_dataset, test_dataset, tokenizer)
 
     if args.do_train:
         trainer.train()

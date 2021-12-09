@@ -1,7 +1,6 @@
 PAD
 UNK
 O
-BRAC
 B-album
 I-album
 B-artist

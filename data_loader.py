@@ -8,6 +8,7 @@ from torch.utils.data import TensorDataset
 
 from utils import get_intent_labels, get_slot_labels
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -92,13 +93,14 @@ class JointProcessor(object):
             guid = "%s-%s" % (set_type, i)
             # 1. input_text
             words = text.split()  # Some are spaced twice
+            slots = slot.split()
             # 2. intent
             intent_label = self.intent_labels.index(intent) if intent in self.intent_labels else self.intent_labels.index("UNK")
             # 3. slot
             slot_labels = []
-            for s in slot.split():
+            for s in slots:
                 slot_labels.append(self.slot_labels.index(s) if s in self.slot_labels else self.slot_labels.index("UNK"))
-
+            #print("words", b_words, "slot labels", slot_labels, "intent", intent_label)
             assert len(words) == len(slot_labels)
             examples.append(InputExample(guid=guid, words=words, intent_label=intent_label, slot_labels=slot_labels))
         return examples
@@ -208,7 +210,7 @@ def convert_examples_to_features(examples, max_seq_len, tokenizer,
 
 
 def load_and_cache_examples(args, tokenizer, mode):
-    processor = processors[args.task](args)
+    processor = processors[args.task.split(".")[0]](args)
 
     # Load data features from cache or dataset file
     cached_features_file = os.path.join(

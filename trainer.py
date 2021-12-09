@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class Trainer(object):
-    def __init__(self, args, train_dataset=None, dev_dataset=None, test_dataset=None):
+    def __init__(self, args, train_dataset=None, dev_dataset=None, test_dataset=None, tokenizer=None):
         self.args = args
         self.train_dataset = train_dataset
         self.dev_dataset = dev_dataset
@@ -31,6 +31,7 @@ class Trainer(object):
                                                       args=args,
                                                       intent_label_lst=self.intent_label_lst,
                                                       slot_label_lst=self.slot_label_lst)
+        self.model.bert.resize_token_embeddings(len(tokenizer))
 
         # GPU or CPU
         self.device = "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu"

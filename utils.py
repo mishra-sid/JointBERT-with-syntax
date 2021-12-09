@@ -9,23 +9,19 @@ from seqeval.metrics import precision_score, recall_score, f1_score
 from transformers import BertConfig, DistilBertConfig, AlbertConfig
 from transformers import BertTokenizer, DistilBertTokenizer, AlbertTokenizer
 
-from model import JointBERT, JointDistilBERT, JointAlbert, JointSpanBERT
+from model import JointBERT, JointDistilBERT, JointAlbert
 
-import spanbert.pytorch_pretrained_bert.modeling as spbm
-import spanbert.pytorch_pretrained_bert.tokenization as spbt
 
 MODEL_CLASSES = {
     'bert': (BertConfig, JointBERT, BertTokenizer),
     'distilbert': (DistilBertConfig, JointDistilBERT, DistilBertTokenizer),
     'albert': (AlbertConfig, JointAlbert, AlbertTokenizer),
-    'spanbert': (spbm.BertConfig, JointSpanBERT, spbt.BertTokenizer),
 }
 
 MODEL_PATH_MAP = {
     'bert': 'bert-base-uncased',
     'distilbert': 'distilbert-base-uncased',
     'albert': 'albert-xxlarge-v1',
-    'spanbert': 'spanbert-base-cased'
 }
 
 
@@ -38,8 +34,10 @@ def get_slot_labels(args):
 
 
 def load_tokenizer(args):
-    return MODEL_CLASSES[args.model_type][2].from_pretrained(args.model_name_or_path)
-
+    tokenizer = MODEL_CLASSES[args.model_type][2].from_pretrained(args.model_name_or_path)
+    special_tokens_dict = {'additional_special_tokens': ['-LBRAC-', '-RBRAC-']}
+    tokenizer.add_special_tokens(special_tokens_dict)
+    return tokenizer
 
 def init_logger():
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
