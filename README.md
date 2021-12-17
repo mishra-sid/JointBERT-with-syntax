@@ -1,6 +1,6 @@
 # JointBERT
 
-(Unofficial) Adding Syntactic Features to  `JointBERT`: [BERT for Joint Intent Classification and Slot Filling](https://arxiv.org/abs/1902.10909)
+Adding Syntactic Features to  `JointBERT`: [BERT for Joint Intent Classification and Slot Filling](https://arxiv.org/abs/1902.10909)
 
 ## Model Architecture
 
