@@ -3,50 +3,24 @@ import copy
 import os 
 
 log_dir = 'logs'
-config_list = [{'config': 'baseline', 'data': 'snips', 'lr': [1e-4, 2e-4], 'nruns': 2}]
+slurm_path = 'slurm_logs'
 
-def get_flags(cfg):
-    data = cfg['data']
-    config = cfg['config']
-    lr = cfg['lr']
-    output = cfg['output']
-    exp_name = cfg['exp_name']
+with open('bin/train_all_models.sh') as f:
+    for ind, cmd in enumerate(f):
+        common = f"""#!/bin/bash
+#SBATCH --job-name=semantic-parsing-{ind}
+#SBATCH -o {slurm_path}/logs_{ind}.out
+#SBATCH -e {slurm_path}/logs_{ind}.err
+#SBATCH --time=0-4:00:00
+#SBATCH --partition=1080ti-short
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=16GB
+#SBATCH --exclude=node030"""
 
-    flags = []
-    flags += [f'--lr {lr}']
+        with open(os.path.join(log_dir, f'script_{ind}.sh'), 'w') as f:
+            f.write(common + "\n")
+            f.write(cmd + "\n")
 
-    if config == 'baseline':
-        flags += [f'--input {data}.txt']
-
-    flags += [f'--output {output}']
-
-    return flags
-
-experiments = collections.defaultdict(list)
-for cfg in config_list:
-    data, config, nruns = cfg['data'], ...
-    key = f'{data}.{config}'
-
-    for _ in range(nruns):
-        i_exp = len(experiments[key])
-        exp_name = f'{key}.{i_exp}'
-        cfg = copy.deepcopy(cfg)
-        cfg['exp_name'] = exp_name
-        cfg['output'] = os.path.join(log_dir, exp_name)
-        flags = get_flags(cfg)
-
-        exp = dict(name=exp_name, flags=flags, cfg=cfg)
-        experiments[key].append(exp)
-
-for exp_list in experiments.values():
-    for exp in exp_list:
-        output = exp['cfg']['output']
-        flags = exp['flags']
-
-        os.system(f'mkdir -p {output}')
-
-        with open(os.path.join(output, 'script.sh'), 'w') as f:
-            f.write('python {}'.format(' '.join(flags)))
-
-        with open('experiments.txt') as f:
-            f.write(f'{output}\n')
+        with open('experiments.txt', 'w') as f:
+            f.write(f'{log_dir}\n')

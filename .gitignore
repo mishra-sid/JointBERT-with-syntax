@@ -115,3 +115,5 @@ sample_pred_out.txt
 
 data/
 models/
+logs/
+slurm_logs/

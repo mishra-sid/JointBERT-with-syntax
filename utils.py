@@ -35,7 +35,11 @@ def get_slot_labels(args):
 
 def load_tokenizer(args):
     tokenizer = MODEL_CLASSES[args.model_type][2].from_pretrained(args.model_name_or_path)
-    special_tokens_dict = {'additional_special_tokens': ['-LBRAC-', '-RBRAC-']}
+    special_tokens = []
+    with open(f'{args.data_dir}/{args.task}/{args.special_token_label_file}') as f:
+        for token in f:
+            special_tokens.append(token.strip())
+    special_tokens_dict = {'additional_special_tokens': special_tokens}
     tokenizer.add_special_tokens(special_tokens_dict)
     return tokenizer
 
@@ -52,23 +56,26 @@ def set_seed(args):
     if not args.no_cuda and torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
 
+def post_process_slot_labels(slot_preds, slot_labels):
+    brac, other = 'BRAC', 'O'
+    proc_slot_preds = [ [ slot_p[ind] for ind in range(len(slot_l)) if slot_l[ind] != brac] for slot_p, slot_l in zip(slot_preds, slot_labels)]
+    proc_slot_preds = [[sl if sl != brac else other for sl in slot] for slot in proc_slot_preds] 
+    proc_slot_labels = [ [sl for sl in slot_l if sl != brac] for slot_l in slot_labels]
+    return proc_slot_preds, proc_slot_labels
 
 def compute_metrics(intent_preds, intent_labels, slot_preds, slot_labels):
-    slot_preds = [ slot_preds[ind] for ind in range(len(slot_labels)) if slot_labels[ind] != 3]
-    slot_labels = [ x for x in slot_labels if x != 3]
     assert len(intent_preds) == len(intent_labels) == len(slot_preds) == len(slot_labels)
     
-
     results = {}
     intent_result = get_intent_acc(intent_preds, intent_labels)
-    slot_result = get_slot_metrics(slot_preds, slot_labels)
-    sementic_result = get_sentence_frame_acc(intent_preds, intent_labels, slot_preds, slot_labels)
+    slot_result, slot_f1_scores = get_slot_metrics(slot_preds, slot_labels)
+    sementic_result, sem_results = get_sentence_frame_acc(intent_preds, intent_labels, slot_preds, slot_labels)
 
     results.update(intent_result)
     results.update(slot_result)
     results.update(sementic_result)
 
-    return results
+    return results, slot_f1_scores, sem_results
 
 
 def get_slot_metrics(preds, labels):
@@ -77,7 +84,7 @@ def get_slot_metrics(preds, labels):
         "slot_precision": precision_score(labels, preds),
         "slot_recall": recall_score(labels, preds),
         "slot_f1": f1_score(labels, preds)
-    }
+    }, [f1_score([l], [p]) for l, p in zip(labels, preds)] 
 
 
 def get_intent_acc(preds, labels):
@@ -108,7 +115,7 @@ def get_sentence_frame_acc(intent_preds, intent_labels, slot_preds, slot_labels)
         slot_result.append(one_sent_result)
     slot_result = np.array(slot_result)
 
-    sementic_acc = np.multiply(intent_result, slot_result).mean()
+    semantic_acc = np.multiply(intent_result, slot_result).mean()
     return {
-        "sementic_frame_acc": sementic_acc
-    }
+        "semantic_frame_acc": semantic_acc
+    }, (intent_result & slot_result).astype(int)

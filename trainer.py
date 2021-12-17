@@ -3,11 +3,12 @@ import logging
 from tqdm import tqdm, trange
 
 import numpy as np
+import json
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from transformers import BertConfig, AdamW, get_linear_schedule_with_warmup
 
-from utils import MODEL_CLASSES, compute_metrics, get_intent_labels, get_slot_labels
+from utils import MODEL_CLASSES, compute_metrics, get_intent_labels, get_slot_labels, post_process_slot_labels
 
 logger = logging.getLogger(__name__)
 
@@ -32,20 +33,16 @@ class Trainer(object):
                                                       intent_label_lst=self.intent_label_lst,
                                                       slot_label_lst=self.slot_label_lst)
         self.model.bert.resize_token_embeddings(len(tokenizer))
-
+    
         # GPU or CPU
         self.device = "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu"
         self.model.to(self.device)
 
-    def train(self):
+    def train_and_eval(self):
         train_sampler = RandomSampler(self.train_dataset)
         train_dataloader = DataLoader(self.train_dataset, sampler=train_sampler, batch_size=self.args.train_batch_size)
 
-        if self.args.max_steps > 0:
-            t_total = self.args.max_steps
-            self.args.num_train_epochs = self.args.max_steps // (len(train_dataloader) // self.args.gradient_accumulation_steps) + 1
-        else:
-            t_total = len(train_dataloader) // self.args.gradient_accumulation_steps * self.args.num_train_epochs
+        t_total = len(train_dataloader) // self.args.gradient_accumulation_steps * self.args.num_train_epochs
 
         # Prepare optimizer and schedule (linear warmup and decay)
         no_decay = ['bias', 'LayerNorm.weight']
@@ -64,8 +61,6 @@ class Trainer(object):
         logger.info("  Total train batch size = %d", self.args.train_batch_size)
         logger.info("  Gradient Accumulation steps = %d", self.args.gradient_accumulation_steps)
         logger.info("  Total optimization steps = %d", t_total)
-        logger.info("  Logging steps = %d", self.args.logging_steps)
-        logger.info("  Save steps = %d", self.args.save_steps)
 
         global_step = 0
         tr_loss = 0.0
@@ -73,7 +68,7 @@ class Trainer(object):
 
         train_iterator = trange(int(self.args.num_train_epochs), desc="Epoch")
 
-        for _ in train_iterator:
+        for c_epoch in train_iterator:
             epoch_iterator = tqdm(train_dataloader, desc="Iteration")
             for step, batch in enumerate(epoch_iterator):
                 self.model.train()
@@ -101,24 +96,16 @@ class Trainer(object):
                     scheduler.step()  # Update learning rate schedule
                     self.model.zero_grad()
                     global_step += 1
+            
+            if (c_epoch + 1) % self.args.eval_every == 0 or (c_epoch + 1) in self.args.eval_at:
+                self.evaluate('dev', c_epoch + 1, dump_preds=True, dump_stats=True)
+                self.evaluate('test', c_epoch + 1, dump_preds=True, dump_stats=True)
+                self.save_model(c_epoch + 1)
 
-                    if self.args.logging_steps > 0 and global_step % self.args.logging_steps == 0:
-                        self.evaluate("dev")
-
-                    if self.args.save_steps > 0 and global_step % self.args.save_steps == 0:
-                        self.save_model()
-
-                if 0 < self.args.max_steps < global_step:
-                    epoch_iterator.close()
-                    break
-
-            if 0 < self.args.max_steps < global_step:
-                train_iterator.close()
-                break
 
         return global_step, tr_loss / global_step
 
-    def evaluate(self, mode):
+    def evaluate(self, mode, c_epoch, dump_preds=False, dump_stats=False):
         if mode == 'test':
             dataset = self.test_dataset
         elif mode == 'dev':
@@ -204,33 +191,51 @@ class Trainer(object):
                     out_slot_label_list[i].append(slot_label_map[out_slot_labels_ids[i][j]])
                     slot_preds_list[i].append(slot_label_map[slot_preds[i][j]])
 
-        total_result = compute_metrics(intent_preds, out_intent_label_ids, slot_preds_list, out_slot_label_list)
+        processed_slot_preds, processed_slot_targets = post_process_slot_labels(slot_preds_list, out_slot_label_list)
+        total_result, individual_slot_f1, individual_sem_preds = compute_metrics(intent_preds, out_intent_label_ids, processed_slot_preds, processed_slot_targets) 
         results.update(total_result)
+        
+        model_dir = f'{self.args.model_dir}/seed={self.args.seed},epochs={c_epoch}'
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
 
+        if dump_preds:
+            with open(model_dir + f'/seq.preds_{mode}', 'w') as pf: 
+                pf.write('intent_pred,intent_act,slot_raw_pred,slot_processed_pred,slot_act,slot_f1,semantic_frame_pred\n')
+                for intent_pred, intent_act, raw_pred, proc_pred, out_slot, f1, sframe in sorted(zip(intent_preds, out_intent_label_ids, slot_preds_list, processed_slot_preds, processed_slot_targets, individual_slot_f1, individual_sem_preds), key=lambda x: x[-2]):
+                    pf.write(f'{intent_pred},{intent_act},{" ".join(raw_pred)},{" ".join(proc_pred)}, {" ".join(out_slot)}, {f1}, {sframe}\n')
+        
         logger.info("***** Eval results *****")
         for key in sorted(results.keys()):
             logger.info("  %s = %s", key, str(results[key]))
 
+        if dump_stats:
+            with open(model_dir + f'/results_{mode}.json', 'w') as res_f:
+                json.dump(results, res_f)
+
         return results
 
-    def save_model(self):
+    def save_model(self, c_epoch):
+        model_dir = f'{self.args.model_dir}/seed={self.args.seed},epochs={c_epoch}'
         # Save model checkpoint (Overwrite)
-        if not os.path.exists(self.args.model_dir):
-            os.makedirs(self.args.model_dir)
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
         model_to_save = self.model.module if hasattr(self.model, 'module') else self.model
-        model_to_save.save_pretrained(self.args.model_dir)
+        model_to_save.save_pretrained(model_dir)
 
         # Save training arguments together with the trained model
-        torch.save(self.args, os.path.join(self.args.model_dir, 'training_args.bin'))
-        logger.info("Saving model checkpoint to %s", self.args.model_dir)
+        torch.save(self.args, os.path.join(model_dir, 'training_args.bin'))
+        logger.info("Saving model checkpoint to %s", model_dir)
 
-    def load_model(self):
+    def load_model(self, c_epoch):
+        model_dir = f'{self.args.model_dir}/seed={self.args.seed},epochs={c_epoch}'
+
         # Check whether model exists
-        if not os.path.exists(self.args.model_dir):
+        if not os.path.exists(model_dir):
             raise Exception("Model doesn't exists! Train first!")
 
         try:
-            self.model = self.model_class.from_pretrained(self.args.model_dir,
+            self.model = self.model_class.from_pretrained(model_dir,
                                                           args=self.args,
                                                           intent_label_lst=self.intent_label_lst,
                                                           slot_label_lst=self.slot_label_lst)

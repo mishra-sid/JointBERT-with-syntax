@@ -1,4 +1,5 @@
 import argparse
+from re import T
 
 from trainer import Trainer
 from utils import init_logger, load_tokenizer, read_prediction_text, set_seed, MODEL_CLASSES, MODEL_PATH_MAP
@@ -17,13 +18,8 @@ def main(args):
     if args.do_train or args.do_eval:
         trainer = Trainer(args, train_dataset, dev_dataset, test_dataset, tokenizer)
 
-    if args.do_train:
-        trainer.train()
-
-    if args.do_eval:
-        trainer.load_model()
-        trainer.evaluate("test")
-
+    if args.do_train and args.do_eval:
+        trainer.train_and_eval()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -33,6 +29,7 @@ if __name__ == '__main__':
     parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir")
     parser.add_argument("--intent_label_file", default="intent_label.txt", type=str, help="Intent Label file")
     parser.add_argument("--slot_label_file", default="slot_label.txt", type=str, help="Slot Label file")
+    parser.add_argument("--special_token_label_file", default="special_token_label.txt", type=str, help="Special token label file")
 
     parser.add_argument("--model_type", default="bert", type=str, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
 
@@ -47,15 +44,15 @@ if __name__ == '__main__':
                         help="Number of updates steps to accumulate before performing a backward/update pass.")
     parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
     parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
-    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
     parser.add_argument("--dropout_rate", default=0.1, type=float, help="Dropout for fully-connected layers")
 
-    parser.add_argument('--logging_steps', type=int, default=200, help="Log every X updates steps.")
-    parser.add_argument('--save_steps', type=int, default=200, help="Save checkpoint every X updates steps.")
 
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the test set.")
+    parser.add_argument("--eval_at", nargs="+", default=[1, 5, 10], help="Evaluate and save models at these particular epoch steps")
+    parser.add_argument("--eval_every", type=int, default=5, help="Evaluate and save models every how many epoch steps")
+
     parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
 
     parser.add_argument("--ignore_index", default=0, type=int,
