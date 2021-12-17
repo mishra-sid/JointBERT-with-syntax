@@ -1,4 +1,8 @@
 from pathlib import Path
+"""
+This script extracts the Constituency labels from augmented data and generates special tokens for training using BERT Based Pre-trained  LM 
+"""
+
 
 data_dir = 'data'
 token_labels = set(['-LBRAC-', '-RBRAC-'])

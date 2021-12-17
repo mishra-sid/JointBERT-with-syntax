@@ -9,6 +9,9 @@ import numpy as np
 
 parser = benepar.Parser("benepar_en3")
 
+"""
+    Get Linearized Parse Tree brackets from  benepar Syntax Tree
+"""
 def get_parse_tree_brackets(tree, allowed_all_constituencies=False, with_labels=False, allowed_constituencies=[], allowed_nesting=True):
     sent = []
     for node in tree:
@@ -31,6 +34,9 @@ def get_parse_tree_brackets(tree, allowed_all_constituencies=False, with_labels=
             sent.append(node)
     return sent
 
+"""
+    Get ground truth brackets
+"""
 def get_ground_truth_brackets(inp_words, target_slots):
     b_words = []
 
@@ -57,6 +63,9 @@ def get_ground_truth_brackets(inp_words, target_slots):
     
     return b_words
 
+"""
+   Dump generated data to disk
+"""
 def write_data(inp_path, out_path, setting):
     with open(inp_path / "label") as lab, open(out_path / "label", "w") as lab_out, open(inp_path / "seq.in") as inp_inp, open(inp_path / "seq.out") as inp_out, \
             open(out_path / "seq.in", "w") as out_in, open(out_path / "seq.out", "w") as out_out:
@@ -65,6 +74,7 @@ def write_data(inp_path, out_path, setting):
             inp_words = sent_inp.split()
             out_words = sent_out.split()
             bracketed_sent = inp_words
+            # Supervised parser
             if "bracketed" in setting:
                 if setting.endswith("ground_truth"):
                     bracketed_sent = get_ground_truth_brackets(inp_words, out_words)
@@ -91,7 +101,7 @@ def write_data(inp_path, out_path, setting):
                 else:
                     out_sent.append(out_words[c_ind])
                     c_ind += 1
-            
+            # control experiment
             if "control" in setting and str(out_path).endswith("train"):
                 proc_in_sents.append(bracketed_sent)
                 proc_out_sents.append(out_sent)
@@ -124,7 +134,7 @@ def write_data(inp_path, out_path, setting):
                 lab_out.write(label)
 
 
-
+# Generate data
 def generate_data(args):
     inp_dir_path = Path(args.input_dir)
     out_dir_path = Path(args.output_dir)
