@@ -74,8 +74,8 @@ def main():
     loss_recs_df = pd.DataFrame.from_dict(loss_recs)
     test_perf_df.set_index(['data', 'setting'], inplace=True)
     loss_recs_df.set_index(['data', 'setting'], inplace=True)
-    print(loss_recs_df.to_latex(float_format="%.2f"))
-    # print((test_perf_df * 100).to_latex(float_format="%.2f"))
+    #print(loss_recs_df.to_markdown())
+    print((test_perf_df * 100).to_markdown())
         #df.to_csv(f'results_{data}.csv', index=False)
 
 if __name__ == '__main__':
